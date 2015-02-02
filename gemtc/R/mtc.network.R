@@ -350,7 +350,9 @@ mtc.nr.comparisons <- function(network) {
   m <- mtc.study.treatment.matrix(network)
   comp <- mtc.comparisons(network)
   cm <- as.matrix(comp)
-  nr <- aaply(cm, 1, function(co) {sum(rowSums(m[,co]) == 2)})
+  nr <- aaply(cm, 1, function(co) {
+    sum(rowSums(m[,co, drop=FALSE]) == 2)
+  })
   cbind(comp, nr)
 }
 
@@ -391,10 +393,11 @@ graph.create <- function(v, e, ...) {
   g
 }
 
-mtc.network.graph <- function(network) {
-  comparisons <- mtc.nr.comparisons(network)
-  treatments <- network[['treatments']][['id']]
-  graph.create(treatments, comparisons, arrow.mode=0)
+mtc.network.graph <- function(network, include.nr.comparisons=FALSE) {
+    comp <- if (include.nr.comparisons) mtc.nr.comparisons else mtc.comparisons
+    comparisons <- comp(network)
+    treatments <- network[['treatments']][['id']]
+    graph.create(treatments, comparisons, arrow.mode=0)
 }
 
 ## mtc.network class methods
@@ -415,11 +418,12 @@ mtc.study.treatment.matrix <- function(network) {
   object <- fix.network(network)
   data <- mtc.merge.data(object)
   studies <- unique(data[['study']])
-  m <- sapply(object[['treatments']][['id']], function(treatment) {
-    sapply(studies, function(study) {
+  m <- laply(object[['treatments']][['id']], function(treatment) {
+    laply(studies, function(study) {
       any(data[['study']] == study & data[['treatment']] == treatment)
-    })
-  })
+    }, .drop=TRUE)
+  }, .drop=FALSE)
+  m <- t(m)
   colnames(m) <- object[['treatments']][['id']]
   m
 }
@@ -438,6 +442,6 @@ summary.mtc.network <- function(object, ...) {
 
 plot.mtc.network <- function(x, layout=igraph::layout.circle, ...) {
   x <- fix.network(x)
-  g <- mtc.network.graph(x)
+  g <- mtc.network.graph(x, TRUE)
   igraph::plot.igraph(g, layout=layout, edge.width=E(g)$weight, ...)
 }
